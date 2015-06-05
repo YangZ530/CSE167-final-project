@@ -62,7 +62,7 @@ void Window::initialize(void)
 	Globals::dirLight.ambientColor = Color(0.6, 0.6, 0.6);
 	Globals::dirLight.specularColor = Color(0.7, 0.7, 0.7);
 
-	glCullFace(GL_BACK);
+	glCullFace(GL_FRONT_AND_BACK);
 	room = Room(100);
 	cube = Cube(5);
 	//Initialize room matrix:
