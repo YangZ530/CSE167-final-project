@@ -7,21 +7,19 @@ class Shader;
 
 class Cube : public Drawable
 {
-    
+
 public:
 	Shader *shader;
-    
-    float size;
-    
-    Cube(float);
-    virtual ~Cube(void);
-    
-    virtual void draw(DrawData&);
-    virtual void update(UpdateData&);
-    
-    void spin(float);
-    
+
+	float size;
+
+	Cube(float);
+	virtual ~Cube(void);
+
+	virtual void draw(DrawData&);
+	virtual void update(UpdateData&);
+
+	void spin(float);
+
 };
-
 #endif
-

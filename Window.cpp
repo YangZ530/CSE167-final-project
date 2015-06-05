@@ -9,6 +9,7 @@
 #endif
 
 #include "Window.h"
+#include "Room.h"
 #include "Cube.h"
 #include "Matrix4.h"
 #include "Globals.h"
@@ -33,24 +34,47 @@ bool Window::move_left = false;
 bool Window::move_right = false;
 bool Window::fpsMode = false;
 
+Room room = Room(100);
+Cube cube = Cube(10);
+
 void Window::initialize(void)
 {
 	//Setup the light
-	Vector4 lightPos(0.0, 10.0, 15.0, 1.0);
-	Globals::light.position = lightPos;
-	Globals::light.quadraticAttenuation = 0;
-	Globals::light.diffuseColor = Color(1, 1, 1);
-	Globals::light.specularColor = Color(1, 1, 1);
-//	Globals::spotL.position = Globals::camera.d.toVector4(1);
-//	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Vector4 lightPos(0.0, 30.0, 20.0, 1.0);
+	Globals::ptLight.position = lightPos;
+	Globals::ptLight.quadraticAttenuation = 0;
+	Globals::ptLight.diffuseColor = Color(0.7, 0.7, 0.7);
+	Globals::ptLight.specularColor = Color(0.7, 0.7, 0.7);
+	Globals::ptLight.ambientColor = Color(0.2, 0.2, 0.2);
 
+	Globals::spotL.position = Matrix4().makeTranslate(5,0,1) * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Globals::spotL.diffuseColor = Color(1, 1, 1);
+	Globals::spotL.specularColor = Color(1, 1, 1);
+	Globals::spotL.ambientColor = Color(0, 0, 0);
+	Globals::spotL.cutoff = 10;
+	Globals::spotL.exponent = 5;
+	Globals::spotL.quadraticAttenuation = 0;
+
+	Globals::dirLight.quadraticAttenuation = 0.002;
+	Globals::dirLight.position = Vector4(0.0, 100.0, 50.0, 0.0);
+	Globals::dirLight.diffuseColor = Color(0.3, 0.3, 0.3);
+	Globals::dirLight.ambientColor = Color(0.6, 0.6, 0.6);
+	Globals::dirLight.specularColor = Color(0.7, 0.7, 0.7);
+
+	glCullFace(GL_BACK);
+	room = Room(100);
+	cube = Cube(5);
 	//Initialize room matrix:
-	Globals::room.toWorld.identity();
+	room.toWorld.identity();
+	cube.toWorld.identity();
+	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(0, -40, 0);
 
 	//Setup the room's material properties
 	//Color color(0x23ff27ff);
 	Color color(0.7, 0.7, 0.7);
-	Globals::room.material = Material(0);
+	room.material = Material(1);
+	cube.material = Material(2);
 }
 
 //----------------------------------------------------------------------------
@@ -65,7 +89,7 @@ void Window::idleCallback()
 	//Globals::room.spin(radians);
 
 	//Call the update function on room
-	Globals::room.update(Globals::updateData);
+	room.update(Globals::updateData);
 
 	//Call the display routine to draw the room
 	displayCallback();
@@ -80,7 +104,7 @@ void Window::reshapeCallback(int w, int h)
 	glViewport(0, 0, w, h);                                          //Set new viewport size
 	glMatrixMode(GL_PROJECTION);                                     //Set the OpenGL matrix mode to Projection
 	glLoadIdentity();                                                //Clear the projection matrix by loading the identity
-	gluPerspective(60.0, double(width) / (double)height, 1.0, 1000.0); //Set perspective projection viewing frustum
+	gluPerspective(40.0, (double)width / (double)height, 1.0, 1000.0); //Set perspective projection viewing frustum
 }
 
 //----------------------------------------------------------------------------
@@ -89,13 +113,17 @@ void Window::displayCallback()
 {
 	//Update camera
 	if (move_forward)
-		Globals::camera.goForward(0.01);
+		Globals::camera.goForward(0.03);
 	if (move_backward)
-		Globals::camera.goBack(0.01);
+		Globals::camera.goBack(0.03);
 	if (move_left)
-		Globals::camera.goLeft(0.01);
+		Globals::camera.goLeft(0.03);
 	if (move_right)
-		Globals::camera.goRight(0.01);
+		Globals::camera.goRight(0.03);
+	/*
+	Globals::spotL.position = Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	*/
 
 	//if (fpsMode)
 		//glutWarpPointer(width / 2, height / 2);
@@ -118,11 +146,14 @@ void Window::displayCallback()
 	//Bind the light to slot 0.  We do this after the camera matrix is loaded so that
 	//the light position will be treated as world coordiantes
 	//(if we didn't the light would move with the camera, why is that?)
-//	Globals::spotL.bind(2);
-	Globals::light.bind(0);
+
+//	Globals::ptLight.bind(0);
+	Globals::dirLight.bind(1);
+	Globals::spotL.bind(0);
 
 	//Draw the room!
-	Globals::room.draw(Globals::drawData);
+	room.draw(Globals::drawData);
+	cube.draw(Globals::drawData);
 
 	//Pop off the changes we made to the matrix stack this frame
 	glPopMatrix();
@@ -145,7 +176,7 @@ void Window::processNormalKeys(unsigned char key, int x, int y) {
 	Vector4 v;
 
 	v.set(0, 0, 0, 1);
-	oldPosition = Globals::room.toWorld * v;
+	oldPosition = room.toWorld * v;
 
 	switch (key)
 	{
@@ -178,7 +209,7 @@ void Window::processNormalKeys(unsigned char key, int x, int y) {
 		exit(0);	
 	}
 
-	position = Globals::room.toWorld * v;
+	position = room.toWorld * v;
 	position.print("The position of the room is(ignore w):");
 	
 }
@@ -243,8 +274,8 @@ void Window::processMotion(int x, int y)
 
 		Globals::camera.arbitraryLook(trans);
 
-		Globals::spotL.position = Globals::camera.d.toVector4(1);
-		Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+//		Globals::spotL.position = Globals::camera.e.toVector4(1);
+//		Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 		glutWarpPointer(width / 2, height / 2);
 

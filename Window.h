@@ -12,6 +12,8 @@ protected:
 
 	static Shader* shader;
 
+	static void setupShadowMap();
+
 public:
     
 	static int width, height, pressedMouse, mouse_x, mouse_y;

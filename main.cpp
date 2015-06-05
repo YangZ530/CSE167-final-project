@@ -9,7 +9,6 @@
 #endif
 
 #include "Window.h"
-#include "Cube.h"
 #include "Matrix4.h"
 #include "Globals.h"
 #include "MathTestBench.h"

@@ -25,6 +25,7 @@ Light::Light(int model)
 		constantAttenuation = 1.0;
 		linearAttenuation = 0.0;
 		quadraticAttenuation = 0.0005;
+		cutoff = -1;
 		break;
 
 	case POINT:
@@ -35,6 +36,7 @@ Light::Light(int model)
 		constantAttenuation = 1.0;
 		linearAttenuation = 0.0;
 		quadraticAttenuation = 0.0005;
+		cutoff = -1;
 		break;
 
 	case SPOT:
