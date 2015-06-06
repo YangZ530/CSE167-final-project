@@ -12,7 +12,7 @@
 Cube::Cube(float size) : Drawable()
 {
 	this->size = size;
-	shader = new Shader("SpotLight.vert", "SpotLight.frag", true);
+	shader = new Shader("lighting.vert", "lighting.frag", true);
 }
 
 Cube::~Cube()

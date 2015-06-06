@@ -40,35 +40,34 @@ Cube cube = Cube(10);
 void Window::initialize(void)
 {
 	//Setup the light
-	Vector4 lightPos(0.0, 30.0, 20.0, 1.0);
-	Globals::ptLight.position = lightPos;
+	Globals::ptLight.position = Vector4(0.0, 45.0, 0.0, 1.0);
 	Globals::ptLight.quadraticAttenuation = 0;
-	Globals::ptLight.diffuseColor = Color(0.7, 0.7, 0.7);
-	Globals::ptLight.specularColor = Color(0.7, 0.7, 0.7);
+	Globals::ptLight.diffuseColor = Color(0.4, 0.4, 0.4);
+	Globals::ptLight.specularColor = Color(0.2, 0.2, 0.2);
 	Globals::ptLight.ambientColor = Color(0.2, 0.2, 0.2);
 
-	Globals::spotL.position = Matrix4().makeTranslate(5,0,1) * Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
-	Globals::spotL.diffuseColor = Color(1, 1, 1);
-	Globals::spotL.specularColor = Color(1, 1, 1);
-	Globals::spotL.ambientColor = Color(0, 0, 0);
-	Globals::spotL.cutoff = 10;
-	Globals::spotL.exponent = 5;
+	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+
+	Globals::spotL.diffuseColor = Color(0.5, 0.6, 0.5);
+	Globals::spotL.specularColor = Color(0.6, 0.7, 0.6);
+	Globals::spotL.ambientColor = Color(0.2, 0.2, 0.2);
+	Globals::spotL.cutoff = 7;
+	Globals::spotL.exponent = 100;
 	Globals::spotL.quadraticAttenuation = 0;
 
-	Globals::dirLight.quadraticAttenuation = 0.002;
-	Globals::dirLight.position = Vector4(0.0, 100.0, 50.0, 0.0);
-	Globals::dirLight.diffuseColor = Color(0.3, 0.3, 0.3);
-	Globals::dirLight.ambientColor = Color(0.6, 0.6, 0.6);
-	Globals::dirLight.specularColor = Color(0.7, 0.7, 0.7);
+	Globals::dirLight.position = Vector4(0.0, 0.0, 0.0, 0.0);
+	Globals::dirLight.diffuseColor = Color(0.4, 0.4, 0.4);
+	Globals::dirLight.ambientColor = Color(0.2, 0.2, 0.2);
+	Globals::dirLight.specularColor = Color(0.2, 0.2, 0.2);
 
 	glCullFace(GL_FRONT_AND_BACK);
 	room = Room(100);
-	cube = Cube(5);
+	cube = Cube(4);
 	//Initialize room matrix:
 	room.toWorld.identity();
 	cube.toWorld.identity();
-	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(0, -40, 0);
+	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(0, -46, 0);
 
 	//Setup the room's material properties
 	//Color color(0x23ff27ff);
@@ -120,10 +119,9 @@ void Window::displayCallback()
 		Globals::camera.goLeft(0.03);
 	if (move_right)
 		Globals::camera.goRight(0.03);
-	/*
-	Globals::spotL.position = Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
-	*/
+
+	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 	//if (fpsMode)
 		//glutWarpPointer(width / 2, height / 2);
@@ -147,8 +145,8 @@ void Window::displayCallback()
 	//the light position will be treated as world coordiantes
 	//(if we didn't the light would move with the camera, why is that?)
 
-//	Globals::ptLight.bind(0);
-	Globals::dirLight.bind(1);
+	Globals::ptLight.bind(2);
+	//Globals::dirLight.bind(1);
 	Globals::spotL.bind(0);
 
 	//Draw the room!
@@ -275,7 +273,8 @@ void Window::processMotion(int x, int y)
 		Globals::camera.arbitraryLook(trans);
 
 //		Globals::spotL.position = Globals::camera.e.toVector4(1);
-//		Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+		Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+		Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 		glutWarpPointer(width / 2, height / 2);
 
