@@ -2,7 +2,6 @@
 #define CSE167_Room_h
 
 #include "Drawable.h"
-#include "glm/glm.hpp"
 
 class Shader;
 
@@ -24,7 +23,7 @@ public:
     virtual void draw(DrawData&);
     virtual void update(UpdateData&);
 
-	void depthRender();
+	void depthRender(DrawData& data);
     
     void spin(float);
     

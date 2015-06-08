@@ -8,11 +8,16 @@ class Shader;
 class Window	  // OpenGL output window related routines
 {
 protected:
+
+
 	static Vector3 trackBall(float, float);
 
 	static Shader* shader;
 
-	static void setupShadowMap();
+	static void genFBO();
+	static void setupLightMatrices(float position_x, float position_y, float position_z, float lookAt_x, float lookAt_y, float lookAt_z);
+	static void setupMatrices(float position_x, float position_y, float position_z, float lookAt_x, float lookAt_y, float lookAt_z);
+	static void setTextureMatrix(void);
 
 public:
     

@@ -14,8 +14,6 @@
 #include "Matrix4.h"
 #include "Globals.h"
 
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
 
 #define RADIANS 0.0005
 #define X 0
@@ -39,6 +37,11 @@ bool Window::fpsMode = false;
 
 Room room = Room(100);
 Cube cube = Cube(10);
+
+static GLuint depthTextureId;
+static GLuint fboId;
+static GLuint shadowMapUniform;
+Shader *Window::shader = new Shader("shadow_simple.vert", "shadow_simple.frag", true);
 
 void Window::initialize(void)
 {
@@ -67,19 +70,21 @@ void Window::initialize(void)
 	Globals::dirLight.ambientColor = Color(0.2, 0.2, 0.2);
 	Globals::dirLight.specularColor = Color(0.2, 0.2, 0.2);
 
-	glCullFace(GL_FRONT_AND_BACK);
 	room = Room(100);
-	cube = Cube(4);
+	cube = Cube(3);
 	//Initialize room matrix:
 	room.toWorld.identity();
 	cube.toWorld.identity();
-	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(0, -46, 0);
+	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(5, -48.5, -25.0);
 
 	//Setup the room's material properties
 	//Color color(0x23ff27ff);
 	Color color(0.7, 0.7, 0.7);
 	room.material = Material(1);
 	cube.material = Material(2);
+	//shader = new Shader("shadow_simple.vert", "shadow_simple.frag", true);	
+	shader = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
+	genFBO();
 }
 
 //----------------------------------------------------------------------------
@@ -126,69 +131,78 @@ void Window::displayCallback()
 	if (move_right)
 		Globals::camera.goRight(0.03);
 
-//	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-//	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+//	Globals::spotL.position = Globals::camera.e.toVector4(1);
+//	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
-	//if (fpsMode)
-		//glutWarpPointer(width / 2, height / 2);
-
-	GLuint FramebufferName = 0;
-	glGenFramebuffers(1, &FramebufferName);
-	glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
-
-	GLuint depthTexture;
-	glGenTextures(1, &depthTexture);
-	glBindTexture(GL_TEXTURE_2D, depthTexture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-	glDrawBuffer(GL_NONE);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
-
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboId); //start rendering offscreen
+	glUseProgramObjectARB(0);
 	glViewport(0, 0, 1024, 1024);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(45, 1, 1, 1000.0);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	float* p = Globals::spotL.position.ptr();
-	float* d = (Globals::spotL.position + Globals::spotL.direction).ptr();
-	gluLookAt(p[0], p[1], p[2], d[0], d[1], d[2], 0, 1, 0);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	Vector4 p_light = Globals::spotL.position;
+	Vector4 l_light = Globals::spotL.position + Globals::spotL.direction;
+	//Vector4 l_light = Globals::spotL.direction;
+	setupLightMatrices(p_light[0], p_light[1], p_light[2], l_light[0], l_light[1], l_light[2]);
+	//glCullFace(GL_FRONT);
+	Globals::spotL.bind(0);
+	cube.depthRender(Globals::drawData);
+	room.depthRender(Globals::drawData);
+//	cube.draw(Globals::drawData);
+//	room.draw(Globals::drawData);
 
-	Matrix4 lightP;
-	Matrix4 lightMV;
-	glGetFloatv(GL_PROJECTION_MATRIX, lightP.ptr());
-	glGetFloatv(GL_MODELVIEW_MATRIX, lightMV.ptr());
-	Matrix4 lightMVP = lightMV * lightP;
+	setTextureMatrix();
 
-	cube.depthMVP = lightMVP * cube.toWorld;
-	room.depthMVP = lightMVP*room.toWorld;
-
-	Matrix4 bias(
-		0.5, 0.0, 0.0, 0.0,
-		0.0, 0.5, 0.0, 0.0,
-		0.0, 0.0, 0.5, 0.0,
-		0.5, 0.5, 0.5, 1.0);
-
-	cube.depthBiasMVP = cube.depthMVP * bias;
-	room.depthBiasMVP = room.depthMVP * bias;
-
-	//Clear color and depth buffers
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); //start render screen
+	glViewport(0, 0, width, height);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgramObjectARB(shader->getPid());
+	shadowMapUniform = glGetUniformLocationARB(shader->getPid(), "ShadowMap");
+	glUniform1iARB(shadowMapUniform, 7);
+	glActiveTextureARB(GL_TEXTURE7);
+	glBindTexture(GL_TEXTURE_2D, depthTextureId);
+
+	Vector3 p_camera = Globals::camera.e;
+	Vector3 l_camera = Globals::camera.d;
+	setupMatrices(p_camera[0], p_camera[1], p_camera[2], l_camera[0], l_camera[1], l_camera[2]);
+
+	//Globals::ptLight.bind(2);
+//	Globals::dirLight.bind(1);
+	Globals::spotL.bind(0);
 
 	//Draw the room!
-	room.depthRender();
-	cube.depthRender();
+//	room.draw(Globals::drawData);
+//	cube.draw(Globals::drawData);
+	cube.depthRender(Globals::drawData);
+	room.depthRender(Globals::drawData);
+	
+	/*
+	glUseProgramObjectARB(0);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-width / 2, width / 2, -height / 2, height / 2, 1, 20);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glColor4f(1, 1, 1, 1);
+	glActiveTextureARB(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, depthTextureId);
+	glEnable(GL_TEXTURE_2D);
+	glTranslated(0, 0, -1);
+	glBegin(GL_QUADS);
+	glTexCoord2d(0, 0); glVertex3f(-width / 2, -height/2, 0);
+	glTexCoord2d(1, 0); glVertex3f(width/2, -height/2, 0);
+	glTexCoord2d(1, 1); glVertex3f(width/2, height/2, 0);
+	glTexCoord2d(0, 1); glVertex3f(-width/2, height/2, 0);
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+//	*/
 
-	glFlush();
+	glutSwapBuffers();
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	reshapeCallback(width, height);
-	//Clear color and depth buffers
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+	/*
 	//Set the OpenGL matrix mode to ModelView
 	glMatrixMode(GL_MODELVIEW);
 
@@ -197,11 +211,8 @@ void Window::displayCallback()
 	glLoadMatrixf(Globals::camera.getInverseMatrix().ptr());
 
 	//Globals::ptLight.bind(2);
-	//Globals::dirLight.bind(1);
+	Globals::dirLight.bind(1);
 	Globals::spotL.bind(0);
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, depthTexture);
 
 	//Draw the room!
 	room.draw(Globals::drawData);
@@ -213,6 +224,8 @@ void Window::displayCallback()
 	glFlush();
 
 	glutSwapBuffers();
+	*/
+	
 }
 
 void Window::processNormalKeys(unsigned char key, int x, int y) {
@@ -258,7 +271,7 @@ void Window::processNormalKeys(unsigned char key, int x, int y) {
 	}
 
 	position = room.toWorld * v;
-	position.print("The position of the room is(ignore w):");
+	//position.print("The position of the room is(ignore w):");
 	
 }
 
@@ -349,4 +362,102 @@ Vector3 Window::trackBall(float x, float y)    // The CPoint class is a specific
 	v.set(v[X], v[Y], v[Z]);
 	v.normalize(); // Still need to normalize, since we only capped d, not v.
 	return v;  // return the mouse location on the surface of the trackball
+}
+
+void Window::genFBO(){
+	GLenum FBOstatus;
+
+	// Try to use a texture depth component
+	glGenTextures(1, &depthTextureId);
+	glBindTexture(GL_TEXTURE_2D, depthTextureId);
+
+	// GL_LINEAR does not make sense for depth texture. However, next tutorial shows usage of GL_LINEAR and PCF
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// Remove artefact on the edges of the shadowmap
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+
+	//glTexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor );
+
+
+
+	// No need to force GL_DEPTH_COMPONENT24, drivers usually give you the max precision if available 
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// create a framebuffer object
+	glGenFramebuffersEXT(1, &fboId);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboId);
+
+	// Instruct openGL that we won't bind a color texture with the currently binded FBO
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+
+	// attach the texture to FBO depth attachment point
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, depthTextureId, 0);
+
+	// check FBO status
+	FBOstatus = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+	if (FBOstatus != GL_FRAMEBUFFER_COMPLETE_EXT)
+		printf("GL_FRAMEBUFFER_COMPLETE_EXT failed, CANNOT use FBO\n");
+
+	// switch back to window-system-provided framebuffer
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+}
+
+void Window::setupLightMatrices(float position_x, float position_y, float position_z, float lookAt_x, float lookAt_y, float lookAt_z)
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45, 1, 1, 40000);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(position_x, position_y, position_z, lookAt_x, lookAt_y, lookAt_z, 0, 1, 0);
+}
+
+void Window::setupMatrices(float position_x, float position_y, float position_z, float lookAt_x, float lookAt_y, float lookAt_z)
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45, (double)width / (double)height, 1, 40000);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(position_x, position_y, position_z, lookAt_x, lookAt_y, lookAt_z, 0, 1, 0);
+}
+
+void Window::setTextureMatrix(void)
+{
+	static double modelView[16];
+	static double projection[16];
+
+	// This is matrix transform every coordinate x,y,z
+	// x = x* 0.5 + 0.5 
+	// y = y* 0.5 + 0.5 
+	// z = z* 0.5 + 0.5 
+	// Moving from unit cube [-1,1] to [0,1]  
+	const GLdouble bias[16] = {
+		0.5, 0.0, 0.0, 0.0,
+		0.0, 0.5, 0.0, 0.0,
+		0.0, 0.0, 0.5, 0.0,
+		0.5, 0.5, 0.5, 1.0 };
+
+	// Grab modelview and transformation matrices
+	glGetDoublev(GL_MODELVIEW_MATRIX, modelView);
+	glGetDoublev(GL_PROJECTION_MATRIX, projection);
+
+
+	glMatrixMode(GL_TEXTURE);
+	glActiveTextureARB(GL_TEXTURE7);
+
+	glLoadIdentity();
+	glLoadMatrixd(bias);
+
+	// concatating all matrice into one.
+	glMultMatrixd(projection);
+	glMultMatrixd(modelView);
+
+	// Go back to normal matrix mode
+	glMatrixMode(GL_MODELVIEW);
 }

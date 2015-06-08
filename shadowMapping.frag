@@ -3,10 +3,9 @@
 
 varying vec4 position;
 varying vec3 normal;
-varying vec4 shadowCoord;
+varying vec4 ShadowCoord;
 
-uniform sampler2D shadowMap;
-uniform mat4 depthBiasMVP;
+uniform sampler2D ShadowMap;
 
 #define MAXLIGHTS 8
 #define OUTER_ANGLE 0.97
@@ -33,13 +32,18 @@ void main()
 			L = normalize(L);
 			R = reflect(-L, N);
 			
-			vec4 shadowCoordinateWdivide = shadowCoord / shadowCoord.w ;
-			// Used to lower moire pattern and self-shadowing
-			shadowCoordinateWdivide.z += 0.0005;
-		
-			float distanceFromLight = texture2D(shadowMap, shadowCoordinateWdivide.st).z;		
-		
-			visibility = (distanceFromLight < shadowCoordinateWdivide.z) ? 0.0 : 1.0 ;
+			vec4 shadowCoordinateWdivide = ShadowCoord / ShadowCoord.w ;
+	
+			// Used to lower moir?? pattern and self-shadowing
+			shadowCoordinateWdivide.z -= 0.0005;
+	
+	
+			float distanceFromLight = texture2D(ShadowMap,shadowCoordinateWdivide.st).z;
+	
+	
+			float shadow = 1.0;
+			if (ShadowCoord.w > 0.0)
+				shadow = distanceFromLight < shadowCoordinateWdivide.z ? 0.5 : 1.0 ;
 			
 			att = 1.0 / (gl_LightSource[i].constantAttenuation
 						+ gl_LightSource[i].linearAttenuation * dist
@@ -57,12 +61,13 @@ void main()
 					att = att * pow(cosine, gl_LightSource[i].spotExponent);
 				}
 				att = clamp((cosine - OUTER_ANGLE)/delta_angle, 0.0, 1.0);
+				att *= shadow;
 			}
 		}
-		vec3 globalAmbient = visibility * vec3(gl_FrontLightModelProduct.sceneColor)
+		vec3 globalAmbient = vec3(gl_FrontLightModelProduct.sceneColor)
 								* vec3(gl_FrontMaterial.ambient);
 		
-		vec3 ambientReflection = visibility * vec3(gl_LightSource[i].ambient)
+		vec3 ambientReflection = vec3(gl_LightSource[i].ambient)
 									* vec3(gl_FrontMaterial.ambient);
 		
 		vec3 specularReflection;
@@ -72,10 +77,10 @@ void main()
 			specularReflection = vec3(0.0, 0.0, 0.0);
 		}
 		else{
-			diffuseReflection = att * visibility * vec3(gl_LightSource[i].diffuse)
+			diffuseReflection = att * vec3(gl_LightSource[i].diffuse)
 									* vec3(gl_FrontMaterial.diffuse)
 									* max(0.0, dot(N, L));
-			specularReflection = att * visibility * vec3(gl_LightSource[i].specular)
+			specularReflection = att * vec3(gl_LightSource[i].specular)
 									* vec3(gl_FrontMaterial.specular)
 									* pow(max(0.0, dot(R, E)), gl_FrontMaterial.shininess);
 		}

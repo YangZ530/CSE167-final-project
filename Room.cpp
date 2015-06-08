@@ -12,15 +12,17 @@
 Room::Room(float size) : Drawable()
 {
     this->size = size;
-	lighting = new Shader("lighting.vert", "lighting.frag", true);
+	//lighting = new Shader("lighting.vert", "lighting.frag", true);
 	shadow = new Shader("shadowMap.vert", "shadowMap.frag", true);
 	shadowMap = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
-	shader = lighting;
 }
 
 Room::~Room()
 {
     //Delete any dynamically allocated memory/objects here
+	//delete shadow;
+	//delete shadowMap;
+	//delete lighting;
 }
 
 
@@ -40,12 +42,6 @@ void Room::draw(DrawData& data)
     glPushMatrix();
     glMultMatrixf(toWorld.ptr());
     
-	shadowMap->bind();
-
-	GLuint depthBiasMatrixID = glGetUniformLocation(shadowMap->getPid(), "depthBiasMVP");
-	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, depthBiasMVP.ptr());
-	GLuint ShadowMapID = glGetUniformLocation(shadowMap->getPid(), "shadowMap");
-	glUniform1i(ShadowMapID, 0);
 
     glBegin(GL_QUADS);
     
@@ -98,8 +94,6 @@ void Room::draw(DrawData& data)
     glVertex3f(-halfSize, -halfSize,  halfSize);
     
     glEnd();
-
-	shadowMap->unbind();
     
     //The above glBegin, glEnd, glNormal and glVertex calls can be replaced with a glut convenience function
     //glutSolidRoom(size);
@@ -123,55 +117,68 @@ void Room::spin(float radians)
     toWorld = toWorld * rotation;
 }
 
-void Room::depthRender(){
+void Room::depthRender(DrawData& data){
+	material.apply();
+	//Se the OpenGL Matrix mode to ModelView (used when drawing geometry)
 	glMatrixMode(GL_MODELVIEW);
 
+	//Push a save state onto the matrix stack, and multiply in the toWorld matrix
 	glPushMatrix();
 	glMultMatrixf(toWorld.ptr());
-	//shader = shadow;
 
 	float halfSize = size / 2.0;
 
-	shadow->bind();
-
-	GLuint depthMatrixID = glGetUniformLocation(shadow->getPid(), "depthMVP");
-	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, depthMVP.ptr());
-
 	glBegin(GL_QUADS);
-
+	glColor3f(1, 1, 1);
+	// Draw front face:
+	glColor3f(1, 0, 0); // red
+	glNormal3f(0.0, 0.0, -1.0);
 	glVertex3f(-halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, -halfSize, halfSize);
 	glVertex3f(-halfSize, -halfSize, halfSize);
 
+	// Draw left side:
+	glColor3f(1, 1, 0); // yellow
+	glNormal3f(1.0, 0.0, 0.0);
 	glVertex3f(-halfSize, halfSize, halfSize);
 	glVertex3f(-halfSize, halfSize, -halfSize);
 	glVertex3f(-halfSize, -halfSize, -halfSize);
 	glVertex3f(-halfSize, -halfSize, halfSize);
 
+	// Draw right side:
+	glColor3f(1, 0, 1); // purple
+	glNormal3f(-1.0, 0.0, 0.0);
 	glVertex3f(halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, halfSize);
 
+	// Draw back face:
+	glColor3f(0, 1, 1); // cyan
+	glNormal3f(0.0, 0.0, 1.0);
 	glVertex3f(-halfSize, halfSize, -halfSize);
 	glVertex3f(halfSize, halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, -halfSize);
 	glVertex3f(-halfSize, -halfSize, -halfSize);
 
+	// Draw top side:
+	glColor3f(0, 1, 0); // green
+	glNormal3f(0.0, -1.0, 0.0);
 	glVertex3f(-halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, -halfSize);
 	glVertex3f(-halfSize, halfSize, -halfSize);
 
+	// Draw bottom side:
+	glColor3f(0, 0, 1); // green
+	glNormal3f(0.0, 1.0, 0.0);
 	glVertex3f(-halfSize, -halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, halfSize);
 	glVertex3f(-halfSize, -halfSize, halfSize);
 
 	glEnd();
-
-	shadow->unbind();
 
 	glPopMatrix();
 }

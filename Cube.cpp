@@ -12,7 +12,7 @@
 Cube::Cube(float size) : Drawable()
 {
 	this->size = size;
-	lighting = new Shader("lighting.vert", "lighting.frag", true);
+	//lighting = new Shader("lighting.vert", "lighting.frag", true);
 	shadow = new Shader("shadowMap.vert", "shadowMap.frag", true);
 	shadowMap = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
 }
@@ -20,6 +20,9 @@ Cube::Cube(float size) : Drawable()
 Cube::~Cube()
 {
 	//Delete any dynamically allocated memory/objects here
+	//delete shadow;
+	//delete lighting;
+	//delete shadowMap;
 }
 
 
@@ -46,13 +49,6 @@ void Cube::draw(DrawData& data)
 	//These are special calls that 'freeze' many internal states of OpenGL.
 	//Once the glBegin state is active many of the calls made to OpenGL (like glMultMatrixf) will be IGNORED!
 	//As a good habit, only call glBegin just before you need to draw, and call end just after you finish
-
-	shadowMap->bind();
-
-	GLuint depthBiasMatrixID = glGetUniformLocation(shadowMap->getPid(), "depthBiasMVP");
-	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, depthBiasMVP.ptr());
-	GLuint ShadowMapID = glGetUniformLocation(shadowMap->getPid(), "shadowMap");
-	glUniform1i(ShadowMapID, 0);
 
 	glBegin(GL_QUADS);
 
@@ -106,8 +102,6 @@ void Cube::draw(DrawData& data)
 
 	glEnd();
 
-	shadowMap->unbind();
-
 	//The above glBegin, glEnd, glNormal and glVertex calls can be replaced with a glut convenience function
 	//glutSolidCube(size);
 
@@ -130,56 +124,62 @@ void Cube::spin(float radians)
 	toWorld = toWorld * rotation;
 }
 
-void Cube::depthRender(){
-	//shader = shadow;
-
+void Cube::depthRender(DrawData& data){
+	material.apply();
+	//Se the OpenGL Matrix mode to ModelView (used when drawing geometry)
 	glMatrixMode(GL_MODELVIEW);
 
+	//Push a save state onto the matrix stack, and multiply in the toWorld matrix
 	glPushMatrix();
 	glMultMatrixf(toWorld.ptr());
 
 	float halfSize = size / 2.0;
 
-	shadow->bind();
-
-	GLuint depthMatrixID = glGetUniformLocation(shadow->getPid(), "depthMVP");
-	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, depthMVP.ptr());
-
 	glBegin(GL_QUADS);
-
+	glColor3f(1,1,1);
+	// Draw front face:
+	glNormal3f(0.0, 0.0, 1.0);
 	glVertex3f(-halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, -halfSize, halfSize);
 	glVertex3f(-halfSize, -halfSize, halfSize);
 
+	// Draw left side:
+	glNormal3f(-1.0, 0.0, 0.0);
 	glVertex3f(-halfSize, halfSize, halfSize);
 	glVertex3f(-halfSize, halfSize, -halfSize);
 	glVertex3f(-halfSize, -halfSize, -halfSize);
 	glVertex3f(-halfSize, -halfSize, halfSize);
 
+	// Draw right side:
+	glNormal3f(1.0, 0.0, 0.0);
 	glVertex3f(halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, halfSize);
 
+	// Draw back face:
+	glNormal3f(0.0, 0.0, -1.0);
 	glVertex3f(-halfSize, halfSize, -halfSize);
 	glVertex3f(halfSize, halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, -halfSize);
 	glVertex3f(-halfSize, -halfSize, -halfSize);
 
+	// Draw top side:
+	glNormal3f(0.0, 1.0, 0.0);
 	glVertex3f(-halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, halfSize);
 	glVertex3f(halfSize, halfSize, -halfSize);
 	glVertex3f(-halfSize, halfSize, -halfSize);
 
+	// Draw bottom side:
+	glNormal3f(0.0, -1.0, 0.0);
 	glVertex3f(-halfSize, -halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, -halfSize);
 	glVertex3f(halfSize, -halfSize, halfSize);
 	glVertex3f(-halfSize, -halfSize, halfSize);
 
 	glEnd();
-
-	shadow->unbind();
 
 	glPopMatrix();
 }
