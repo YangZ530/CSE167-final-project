@@ -3,6 +3,10 @@
 
 varying vec4 position;
 varying vec3 normal;
+varying vec4 shadowCoord;
+
+uniform sampler2D shadowMap;
+uniform mat4 depthBiasMVP;
 
 #define MAXLIGHTS 8
 #define OUTER_ANGLE 0.97
@@ -14,6 +18,7 @@ void main()
 	vec3 L, R;
 	float att;
 	vec3 totalLighting;
+	float visibility;
 
 	for(int i = 0; i < MAXLIGHTS; i++){
 		att = 1.0;
@@ -27,6 +32,15 @@ void main()
 			float dist = length(L);
 			L = normalize(L);
 			R = reflect(-L, N);
+			
+			vec4 shadowCoordinateWdivide = shadowCoord / shadowCoord.w ;
+			// Used to lower moire pattern and self-shadowing
+			shadowCoordinateWdivide.z += 0.0005;
+		
+			float distanceFromLight = texture2D(shadowMap, shadowCoordinateWdivide.st).z;		
+		
+			if (shadowCoord.w > 0.0)
+				visibility = distanceFromLight < shadowCoordinateWdivide.z ? 0.5 : 1.0 ;
 			
 			att = 1.0 / (gl_LightSource[i].constantAttenuation
 						+ gl_LightSource[i].linearAttenuation * dist
@@ -49,7 +63,7 @@ void main()
 		vec3 globalAmbient = vec3(gl_FrontLightModelProduct.sceneColor)
 								* vec3(gl_FrontMaterial.ambient);
 		
-		vec3 ambientReflection = vec3(gl_LightSource[i].ambient)
+		vec3 ambientReflection = visibility * vec3(gl_LightSource[i].ambient)
 									* vec3(gl_FrontMaterial.ambient);
 		
 		vec3 specularReflection;
@@ -59,10 +73,10 @@ void main()
 			specularReflection = vec3(0.0, 0.0, 0.0);
 		}
 		else{
-			diffuseReflection = att * vec3(gl_LightSource[i].diffuse)
+			diffuseReflection = att * visibility * vec3(gl_LightSource[i].diffuse)
 									* vec3(gl_FrontMaterial.diffuse)
 									* max(0.0, dot(N, L));
-			specularReflection = att * vec3(gl_LightSource[i].specular)
+			specularReflection = att * visibility * vec3(gl_LightSource[i].specular)
 									* vec3(gl_FrontMaterial.specular)
 									* pow(max(0.0, dot(R, E)), gl_FrontMaterial.shininess);
 		}

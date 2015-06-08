@@ -12,7 +12,10 @@
 Cube::Cube(float size) : Drawable()
 {
 	this->size = size;
-	shader = new Shader("lighting.vert", "lighting.frag", true);
+	lighting = new Shader("lighting.vert", "lighting.frag", true);
+	shadow = new Shader("shadowMap.vert", "shadowMap.frag", true);
+	shadowMap = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
+	shader = lighting;
 }
 
 Cube::~Cube()
@@ -23,6 +26,9 @@ Cube::~Cube()
 
 void Cube::draw(DrawData& data)
 {
+	//shader = lighting;
+	shader = shadowMap;
+
 	float halfSize = size / 2.0;
 
 	//Apply the material properties
@@ -43,6 +49,11 @@ void Cube::draw(DrawData& data)
 	//As a good habit, only call glBegin just before you need to draw, and call end just after you finish
 
 	shader->bind();
+
+	GLuint depthBiasMatrixID = glGetUniformLocation(shader->getPid(), "depthBiasMVP");
+	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, &depthBiasMVP[0][0]);
+	GLuint ShadowMapID = glGetUniformLocation(shader->getPid(), "shadowMap");
+	glUniform1i(ShadowMapID, 0);
 
 	glBegin(GL_QUADS);
 
@@ -120,7 +131,54 @@ void Cube::spin(float radians)
 	toWorld = toWorld * rotation;
 }
 
+void Cube::depthRender(){
+	shader = shadow;
 
+	float halfSize = size / 2.0;
 
+	glMatrixMode(GL_MODELVIEW);
 
+	glPushMatrix();
+	glMultMatrixf(toWorld.ptr());
 
+	shader->bind();
+
+	GLuint depthMatrixID = glGetUniformLocation(shader->getPid(), "depthMVP");
+	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, &depthMVP[0][0]);
+
+	glBegin(GL_QUADS);
+
+	glVertex3f(-halfSize, halfSize, halfSize);
+	glVertex3f(halfSize, halfSize, halfSize);
+	glVertex3f(halfSize, -halfSize, halfSize);
+	glVertex3f(-halfSize, -halfSize, halfSize);
+
+	glVertex3f(-halfSize, halfSize, halfSize);
+	glVertex3f(-halfSize, halfSize, -halfSize);
+	glVertex3f(-halfSize, -halfSize, -halfSize);
+	glVertex3f(-halfSize, -halfSize, halfSize);
+
+	glVertex3f(halfSize, halfSize, halfSize);
+	glVertex3f(halfSize, halfSize, -halfSize);
+	glVertex3f(halfSize, -halfSize, -halfSize);
+	glVertex3f(halfSize, -halfSize, halfSize);
+
+	glVertex3f(-halfSize, halfSize, -halfSize);
+	glVertex3f(halfSize, halfSize, -halfSize);
+	glVertex3f(halfSize, -halfSize, -halfSize);
+	glVertex3f(-halfSize, -halfSize, -halfSize);
+
+	glVertex3f(-halfSize, halfSize, halfSize);
+	glVertex3f(halfSize, halfSize, halfSize);
+	glVertex3f(halfSize, halfSize, -halfSize);
+	glVertex3f(-halfSize, halfSize, -halfSize);
+
+	glVertex3f(-halfSize, -halfSize, -halfSize);
+	glVertex3f(halfSize, -halfSize, -halfSize);
+	glVertex3f(halfSize, -halfSize, halfSize);
+	glVertex3f(-halfSize, -halfSize, halfSize);
+
+	glEnd();
+
+	shader->unbind();
+}

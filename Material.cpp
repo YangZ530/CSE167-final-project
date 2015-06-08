@@ -30,7 +30,7 @@ Material::Material(int i){
 		shininess = 0.6 * 128.0;
 		break;
 	case 1:
-		ambientColor = Color(0.4, 0.4, 0.4);
+		ambientColor = Color(0.5, 0.5, 0.5);
 		diffuseColor = Color(0.4, 0.4, 0.4);
 		specularColor = Color(0.20, 0.20, 0.20);
 		emissionColor = Color::emissionMaterialDefault();

@@ -2,6 +2,10 @@
 
 varying vec4 position;
 varying vec3 normal;
+varying vec4 shadowCoord;
+
+uniform sampler2DShadow shadowMap;
+uniform mat4 depthBiasMVP;
 
 void main()
 {
@@ -13,4 +17,6 @@ void main()
     
     //Set the gl position of this vertex
     gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+	
+	shadowCoord = depthBiasMVP * gl_Vertex;
 }

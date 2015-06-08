@@ -14,6 +14,9 @@
 #include "Matrix4.h"
 #include "Globals.h"
 
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+
 #define RADIANS 0.0005
 #define X 0
 #define Y 1
@@ -37,6 +40,8 @@ bool Window::fpsMode = false;
 Room room = Room(100);
 Cube cube = Cube(10);
 
+Camera lightCam = Camera();
+
 void Window::initialize(void)
 {
 	//Setup the light
@@ -46,8 +51,11 @@ void Window::initialize(void)
 	Globals::ptLight.specularColor = Color(0.2, 0.2, 0.2);
 	Globals::ptLight.ambientColor = Color(0.2, 0.2, 0.2);
 
-	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Globals::spotL.position = Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+
+//	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+//	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 	Globals::spotL.diffuseColor = Color(0.5, 0.6, 0.5);
 	Globals::spotL.specularColor = Color(0.6, 0.7, 0.6);
@@ -120,11 +128,68 @@ void Window::displayCallback()
 	if (move_right)
 		Globals::camera.goRight(0.03);
 
-	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+//	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+//	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 	//if (fpsMode)
 		//glutWarpPointer(width / 2, height / 2);
+
+	GLuint FramebufferName = 0;
+	glGenFramebuffers(1, &FramebufferName);
+	glBindFramebuffer(GL_FRAMEBUFFER, FramebufferName);
+
+	GLuint depthTexture;
+	glGenTextures(1, &depthTexture);
+	glBindTexture(GL_TEXTURE_2D, depthTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
+
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+
+	glm::vec3 lightPos;
+	lightPos.x = Globals::spotL.position[0];
+	lightPos.y = Globals::spotL.position[1];
+	lightPos.z = Globals::spotL.position[2];
+
+	glm::vec3 lightDir;
+	lightDir.x = Globals::spotL.direction[0];
+	lightDir.y = Globals::spotL.direction[1];
+	lightDir.z = Globals::spotL.direction[2];
+
+	glm::mat4 depthProjectionMatrix = glm::perspective(45.0f, 1.0f, 2.0f, 1000.0f);
+	glm::mat4 depthViewMatrix = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0, 1, 0));
+	glm::mat4 depthModelMatrix = glm::mat4();
+	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
+
+	glm::mat4 biasMatrix(
+		0.5, 0.0, 0.0, 0.0,
+		0.0, 0.5, 0.0, 0.0,
+		0.0, 0.0, 0.5, 0.0,
+		0.5, 0.5, 0.5, 1.0
+		);
+	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+
+	cube.depthMVP = depthMVP;
+	room.depthMVP = depthMVP;
+	cube.depthBiasMVP = depthBiasMVP;
+	room.depthBiasMVP = depthBiasMVP;
+
+	//Clear color and depth buffers
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	//Draw the room!
+	room.draw(Globals::drawData);
+	cube.draw(Globals::drawData);
+
+	glFlush();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	//Clear color and depth buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -132,22 +197,16 @@ void Window::displayCallback()
 	//Set the OpenGL matrix mode to ModelView
 	glMatrixMode(GL_MODELVIEW);
 
-	//Push a matrix save point
-	//This will save a copy of the current matrix so that we can
-	//make changes to it and 'pop' those changes off later.
 	glPushMatrix();
 
-	//Replace the current top of the matrix stack with the inverse camera matrix
-	//This will convert all world coordiantes into camera coordiantes
 	glLoadMatrixf(Globals::camera.getInverseMatrix().ptr());
 
-	//Bind the light to slot 0.  We do this after the camera matrix is loaded so that
-	//the light position will be treated as world coordiantes
-	//(if we didn't the light would move with the camera, why is that?)
-
-	Globals::ptLight.bind(2);
+	//Globals::ptLight.bind(2);
 	//Globals::dirLight.bind(1);
 	Globals::spotL.bind(0);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, depthTexture);
 
 	//Draw the room!
 	room.draw(Globals::drawData);
@@ -156,12 +215,8 @@ void Window::displayCallback()
 	//Pop off the changes we made to the matrix stack this frame
 	glPopMatrix();
 
-	//Tell OpenGL to clear any outstanding commands in its command buffer
-	//This will make sure that all of our commands are fully executed before
-	//we swap buffers and show the user the freshly drawn frame
 	glFlush();
 
-	//Swap the off-screen buffer (the one we just drew to) with the on-screen buffer
 	glutSwapBuffers();
 }
 
@@ -273,8 +328,8 @@ void Window::processMotion(int x, int y)
 		Globals::camera.arbitraryLook(trans);
 
 //		Globals::spotL.position = Globals::camera.e.toVector4(1);
-		Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-		Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+//		Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+//		Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 		glutWarpPointer(width / 2, height / 2);
 
