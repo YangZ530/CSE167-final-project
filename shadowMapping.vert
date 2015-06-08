@@ -4,7 +4,7 @@ varying vec4 position;
 varying vec3 normal;
 varying vec4 shadowCoord;
 
-uniform sampler2DShadow shadowMap;
+uniform sampler2D shadowMap;
 uniform mat4 depthBiasMVP;
 
 void main()

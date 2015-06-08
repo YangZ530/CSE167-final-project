@@ -18,7 +18,7 @@ void main()
 	vec3 L, R;
 	float att;
 	vec3 totalLighting;
-	float visibility;
+	float visibility = 1.0;
 
 	for(int i = 0; i < MAXLIGHTS; i++){
 		att = 1.0;
@@ -39,8 +39,7 @@ void main()
 		
 			float distanceFromLight = texture2D(shadowMap, shadowCoordinateWdivide.st).z;		
 		
-			if (shadowCoord.w > 0.0)
-				visibility = distanceFromLight < shadowCoordinateWdivide.z ? 0.5 : 1.0 ;
+			visibility = (distanceFromLight < shadowCoordinateWdivide.z) ? 0.0 : 1.0 ;
 			
 			att = 1.0 / (gl_LightSource[i].constantAttenuation
 						+ gl_LightSource[i].linearAttenuation * dist
@@ -60,7 +59,7 @@ void main()
 				att = clamp((cosine - OUTER_ANGLE)/delta_angle, 0.0, 1.0);
 			}
 		}
-		vec3 globalAmbient = vec3(gl_FrontLightModelProduct.sceneColor)
+		vec3 globalAmbient = visibility * vec3(gl_FrontLightModelProduct.sceneColor)
 								* vec3(gl_FrontMaterial.ambient);
 		
 		vec3 ambientReflection = visibility * vec3(gl_LightSource[i].ambient)

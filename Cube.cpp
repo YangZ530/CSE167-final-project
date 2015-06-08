@@ -15,7 +15,6 @@ Cube::Cube(float size) : Drawable()
 	lighting = new Shader("lighting.vert", "lighting.frag", true);
 	shadow = new Shader("shadowMap.vert", "shadowMap.frag", true);
 	shadowMap = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
-	shader = lighting;
 }
 
 Cube::~Cube()
@@ -27,7 +26,7 @@ Cube::~Cube()
 void Cube::draw(DrawData& data)
 {
 	//shader = lighting;
-	shader = shadowMap;
+	//shader = shadowMap;
 
 	float halfSize = size / 2.0;
 
@@ -48,11 +47,11 @@ void Cube::draw(DrawData& data)
 	//Once the glBegin state is active many of the calls made to OpenGL (like glMultMatrixf) will be IGNORED!
 	//As a good habit, only call glBegin just before you need to draw, and call end just after you finish
 
-	shader->bind();
+	shadowMap->bind();
 
-	GLuint depthBiasMatrixID = glGetUniformLocation(shader->getPid(), "depthBiasMVP");
-	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, &depthBiasMVP[0][0]);
-	GLuint ShadowMapID = glGetUniformLocation(shader->getPid(), "shadowMap");
+	GLuint depthBiasMatrixID = glGetUniformLocation(shadowMap->getPid(), "depthBiasMVP");
+	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, depthBiasMVP.ptr());
+	GLuint ShadowMapID = glGetUniformLocation(shadowMap->getPid(), "shadowMap");
 	glUniform1i(ShadowMapID, 0);
 
 	glBegin(GL_QUADS);
@@ -107,7 +106,7 @@ void Cube::draw(DrawData& data)
 
 	glEnd();
 
-	shader->unbind();
+	shadowMap->unbind();
 
 	//The above glBegin, glEnd, glNormal and glVertex calls can be replaced with a glut convenience function
 	//glutSolidCube(size);
@@ -132,19 +131,19 @@ void Cube::spin(float radians)
 }
 
 void Cube::depthRender(){
-	shader = shadow;
-
-	float halfSize = size / 2.0;
+	//shader = shadow;
 
 	glMatrixMode(GL_MODELVIEW);
 
 	glPushMatrix();
 	glMultMatrixf(toWorld.ptr());
 
-	shader->bind();
+	float halfSize = size / 2.0;
 
-	GLuint depthMatrixID = glGetUniformLocation(shader->getPid(), "depthMVP");
-	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, &depthMVP[0][0]);
+	shadow->bind();
+
+	GLuint depthMatrixID = glGetUniformLocation(shadow->getPid(), "depthMVP");
+	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, depthMVP.ptr());
 
 	glBegin(GL_QUADS);
 
@@ -180,5 +179,7 @@ void Cube::depthRender(){
 
 	glEnd();
 
-	shader->unbind();
+	shadow->unbind();
+
+	glPopMatrix();
 }

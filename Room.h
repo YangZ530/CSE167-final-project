@@ -15,8 +15,8 @@ public:
     
     float size;
 
-	glm::mat4 depthMVP;
-	glm::mat4 depthBiasMVP;
+	Matrix4 depthMVP;
+	Matrix4 depthBiasMVP;
     
     Room(float);
     virtual ~Room(void);

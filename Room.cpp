@@ -27,7 +27,7 @@ Room::~Room()
 void Room::draw(DrawData& data)
 {
 	//shader = lighting;
-	shader = shadowMap;
+	//shader = shadowMap;
 
     float halfSize = size/2.0;
     
@@ -35,24 +35,16 @@ void Room::draw(DrawData& data)
     //From here forward anything drawn will be drawn with these material
     material.apply();
     
-    //Se the OpenGL Matrix mode to ModelView (used when drawing geometry)
     glMatrixMode(GL_MODELVIEW);
     
-    //Push a save state onto the matrix stack, and multiply in the toWorld matrix
     glPushMatrix();
     glMultMatrixf(toWorld.ptr());
     
-    //Make Room!
-    //Note: The glBegin, and glEnd should always be as close to the glNormal/glVertex calls as possible
-    //These are special calls that 'freeze' many internal states of OpenGL.
-    //Once the glBegin state is active many of the calls made to OpenGL (like glMultMatrixf) will be IGNORED!
-    //As a good habit, only call glBegin just before you need to draw, and call end just after you finish
+	shadowMap->bind();
 
-	shader->bind();
-
-	GLuint depthBiasMatrixID = glGetUniformLocation(shader->getPid(), "depthBiasMVP");
-	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, &depthBiasMVP[0][0]);
-	GLuint ShadowMapID = glGetUniformLocation(shader->getPid(), "shadowMap");
+	GLuint depthBiasMatrixID = glGetUniformLocation(shadowMap->getPid(), "depthBiasMVP");
+	glUniformMatrix4fv(depthBiasMatrixID, 1, GL_FALSE, depthBiasMVP.ptr());
+	GLuint ShadowMapID = glGetUniformLocation(shadowMap->getPid(), "shadowMap");
 	glUniform1i(ShadowMapID, 0);
 
     glBegin(GL_QUADS);
@@ -107,7 +99,7 @@ void Room::draw(DrawData& data)
     
     glEnd();
 
-	shader->unbind();
+	shadowMap->unbind();
     
     //The above glBegin, glEnd, glNormal and glVertex calls can be replaced with a glut convenience function
     //glutSolidRoom(size);
@@ -132,19 +124,18 @@ void Room::spin(float radians)
 }
 
 void Room::depthRender(){
-	shader = shadow;
-
-	float halfSize = size / 2.0;
-
 	glMatrixMode(GL_MODELVIEW);
 
 	glPushMatrix();
 	glMultMatrixf(toWorld.ptr());
+	//shader = shadow;
 
-	shader->bind();
+	float halfSize = size / 2.0;
 
-	GLuint depthMatrixID = glGetUniformLocation(shader->getPid(), "depthMVP");
-	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, &depthMVP[0][0]);
+	shadow->bind();
+
+	GLuint depthMatrixID = glGetUniformLocation(shadow->getPid(), "depthMVP");
+	glUniformMatrix4fv(depthMatrixID, 1, GL_FALSE, depthMVP.ptr());
 
 	glBegin(GL_QUADS);
 
@@ -180,7 +171,9 @@ void Room::depthRender(){
 
 	glEnd();
 
-	shader->unbind();
+	shadow->unbind();
+
+	glPopMatrix();
 }
 
 

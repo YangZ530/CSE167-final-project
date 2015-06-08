@@ -40,8 +40,6 @@ bool Window::fpsMode = false;
 Room room = Room(100);
 Cube cube = Cube(10);
 
-Camera lightCam = Camera();
-
 void Window::initialize(void)
 {
 	//Setup the light
@@ -51,11 +49,11 @@ void Window::initialize(void)
 	Globals::ptLight.specularColor = Color(0.2, 0.2, 0.2);
 	Globals::ptLight.ambientColor = Color(0.2, 0.2, 0.2);
 
-	Globals::spotL.position = Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+//	Globals::spotL.position = Globals::camera.e.toVector4(1);
+//	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
-//	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-//	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
 	Globals::spotL.diffuseColor = Color(0.5, 0.6, 0.5);
 	Globals::spotL.specularColor = Color(0.6, 0.7, 0.6);
@@ -141,56 +139,53 @@ void Window::displayCallback()
 	GLuint depthTexture;
 	glGenTextures(1, &depthTexture);
 	glBindTexture(GL_TEXTURE_2D, depthTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+	glDrawBuffer(GL_NONE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
 
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
+	glViewport(0, 0, 1024, 1024);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluPerspective(45, 1, 1, 1000.0);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	float* p = Globals::spotL.position.ptr();
+	float* d = (Globals::spotL.position + Globals::spotL.direction).ptr();
+	gluLookAt(p[0], p[1], p[2], d[0], d[1], d[2], 0, 1, 0);
 
-	glm::vec3 lightPos;
-	lightPos.x = Globals::spotL.position[0];
-	lightPos.y = Globals::spotL.position[1];
-	lightPos.z = Globals::spotL.position[2];
+	Matrix4 lightP;
+	Matrix4 lightMV;
+	glGetFloatv(GL_PROJECTION_MATRIX, lightP.ptr());
+	glGetFloatv(GL_MODELVIEW_MATRIX, lightMV.ptr());
+	Matrix4 lightMVP = lightMV * lightP;
 
-	glm::vec3 lightDir;
-	lightDir.x = Globals::spotL.direction[0];
-	lightDir.y = Globals::spotL.direction[1];
-	lightDir.z = Globals::spotL.direction[2];
+	cube.depthMVP = lightMVP * cube.toWorld;
+	room.depthMVP = lightMVP*room.toWorld;
 
-	glm::mat4 depthProjectionMatrix = glm::perspective(45.0f, 1.0f, 2.0f, 1000.0f);
-	glm::mat4 depthViewMatrix = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0, 1, 0));
-	glm::mat4 depthModelMatrix = glm::mat4();
-	glm::mat4 depthMVP = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
-
-	glm::mat4 biasMatrix(
+	Matrix4 bias(
 		0.5, 0.0, 0.0, 0.0,
 		0.0, 0.5, 0.0, 0.0,
 		0.0, 0.0, 0.5, 0.0,
-		0.5, 0.5, 0.5, 1.0
-		);
-	glm::mat4 depthBiasMVP = biasMatrix * depthMVP;
+		0.5, 0.5, 0.5, 1.0);
 
-	cube.depthMVP = depthMVP;
-	room.depthMVP = depthMVP;
-	cube.depthBiasMVP = depthBiasMVP;
-	room.depthBiasMVP = depthBiasMVP;
+	cube.depthBiasMVP = cube.depthMVP * bias;
+	room.depthBiasMVP = room.depthMVP * bias;
 
 	//Clear color and depth buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//Draw the room!
-	room.draw(Globals::drawData);
-	cube.draw(Globals::drawData);
+	room.depthRender();
+	cube.depthRender();
 
 	glFlush();
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+	reshapeCallback(width, height);
 	//Clear color and depth buffers
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -214,7 +209,7 @@ void Window::displayCallback()
 
 	//Pop off the changes we made to the matrix stack this frame
 	glPopMatrix();
-
+	
 	glFlush();
 
 	glutSwapBuffers();
