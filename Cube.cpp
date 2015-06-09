@@ -15,6 +15,8 @@ Cube::Cube(float size) : Drawable()
 	//lighting = new Shader("lighting.vert", "lighting.frag", true);
 	shadow = new Shader("shadowMap.vert", "shadowMap.frag", true);
 	shadowMap = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
+//	tex = Texture("companion_cube.ppm");
+	tex = Texture("Doge_Tex.ppm");
 }
 
 Cube::~Cube()
@@ -55,10 +57,10 @@ void Cube::draw(DrawData& data)
 	// Draw front face:
 	glColor3f(1, 0, 0); // red
 	glNormal3f(0.0, 0.0, 1.0);
-	glVertex3f(-halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, -halfSize, halfSize);
-	glVertex3f(-halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 0); glVertex3f(-halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 0); glVertex3f(halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 1); glVertex3f(halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 1); glVertex3f(-halfSize, -halfSize, halfSize);
 
 	// Draw left side:
 	glColor3f(1, 1, 0); // yellow
@@ -102,6 +104,8 @@ void Cube::draw(DrawData& data)
 
 	glEnd();
 
+	tex.unbind();
+
 	//The above glBegin, glEnd, glNormal and glVertex calls can be replaced with a glut convenience function
 	//glutSolidCube(size);
 
@@ -133,53 +137,59 @@ void Cube::depthRender(DrawData& data){
 	glPushMatrix();
 	glMultMatrixf(toWorld.ptr());
 
-	float halfSize = size / 2.0;
+	glMatrixMode(GL_TEXTURE);
+	glActiveTextureARB(GL_TEXTURE7);
+	glPushMatrix();
+	glMultMatrixf(toWorld.ptr());
 
+	float halfSize = size / 2.0;
 	glBegin(GL_QUADS);
 	glColor3f(1,1,1);
 	// Draw front face:
 	glNormal3f(0.0, 0.0, 1.0);
-	glVertex3f(-halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, -halfSize, halfSize);
-	glVertex3f(-halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 0);	glVertex3f(-halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 0);	glVertex3f(halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 1);	glVertex3f(halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 1);	glVertex3f(-halfSize, -halfSize, halfSize);
 
 	// Draw left side:
 	glNormal3f(-1.0, 0.0, 0.0);
-	glVertex3f(-halfSize, halfSize, halfSize);
-	glVertex3f(-halfSize, halfSize, -halfSize);
-	glVertex3f(-halfSize, -halfSize, -halfSize);
-	glVertex3f(-halfSize, -halfSize, halfSize);
+	glTexCoord2f(1, 0);	glVertex3f(-halfSize, halfSize, halfSize);
+	glTexCoord2f(0, 0); glVertex3f(-halfSize, halfSize, -halfSize);
+	glTexCoord2f(0, 1); glVertex3f(-halfSize, -halfSize, -halfSize);
+	glTexCoord2f(1, 1); glVertex3f(-halfSize, -halfSize, halfSize);
 
 	// Draw right side:
 	glNormal3f(1.0, 0.0, 0.0);
-	glVertex3f(halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, halfSize, -halfSize);
-	glVertex3f(halfSize, -halfSize, -halfSize);
-	glVertex3f(halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 0); glVertex3f(halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 0); glVertex3f(halfSize, halfSize, -halfSize);
+	glTexCoord2f(1, 1); glVertex3f(halfSize, -halfSize, -halfSize);
+	glTexCoord2f(0, 1); glVertex3f(halfSize, -halfSize, halfSize);
 
 	// Draw back face:
 	glNormal3f(0.0, 0.0, -1.0);
-	glVertex3f(-halfSize, halfSize, -halfSize);
-	glVertex3f(halfSize, halfSize, -halfSize);
-	glVertex3f(halfSize, -halfSize, -halfSize);
-	glVertex3f(-halfSize, -halfSize, -halfSize);
+	glTexCoord2f(1, 0); glVertex3f(-halfSize, halfSize, -halfSize);
+	glTexCoord2f(0, 0); glVertex3f(halfSize, halfSize, -halfSize);
+	glTexCoord2f(0, 1); glVertex3f(halfSize, -halfSize, -halfSize);
+	glTexCoord2f(1, 1); glVertex3f(-halfSize, -halfSize, -halfSize);
 
 	// Draw top side:
 	glNormal3f(0.0, 1.0, 0.0);
-	glVertex3f(-halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, halfSize, halfSize);
-	glVertex3f(halfSize, halfSize, -halfSize);
-	glVertex3f(-halfSize, halfSize, -halfSize);
+	glTexCoord2f(0, 1); glVertex3f(-halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 1); glVertex3f(halfSize, halfSize, halfSize);
+	glTexCoord2f(1, 0); glVertex3f(halfSize, halfSize, -halfSize);
+	glTexCoord2f(0, 0); glVertex3f(-halfSize, halfSize, -halfSize);
 
 	// Draw bottom side:
 	glNormal3f(0.0, -1.0, 0.0);
-	glVertex3f(-halfSize, -halfSize, -halfSize);
-	glVertex3f(halfSize, -halfSize, -halfSize);
-	glVertex3f(halfSize, -halfSize, halfSize);
-	glVertex3f(-halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 1); glVertex3f(-halfSize, -halfSize, -halfSize);
+	glTexCoord2f(1, 1); glVertex3f(halfSize, -halfSize, -halfSize);
+	glTexCoord2f(1, 0); glVertex3f(halfSize, -halfSize, halfSize);
+	glTexCoord2f(0, 0); glVertex3f(-halfSize, -halfSize, halfSize);
 
 	glEnd();
 
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
 }

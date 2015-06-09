@@ -37,11 +37,16 @@ bool Window::fpsMode = false;
 
 Room room = Room(100);
 Cube cube = Cube(10);
+Cube cube2 = Cube(4);
 
 static GLuint depthTextureId;
 static GLuint fboId;
+static GLuint bloomFboId;
+static GLuint bloomTexId;
 static GLuint shadowMapUniform;
+static GLuint textureUniform;
 Shader *Window::shader = new Shader("shadow_simple.vert", "shadow_simple.frag", true);
+Shader *Window::bloom = new Shader("shadow_simple.vert", "shadow_simple.frag", true);
 
 void Window::initialize(void)
 {
@@ -55,35 +60,39 @@ void Window::initialize(void)
 //	Globals::spotL.position = Globals::camera.e.toVector4(1);
 //	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
-	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(3, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(3, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
-	Globals::spotL.diffuseColor = Color(0.5, 0.6, 0.5);
-	Globals::spotL.specularColor = Color(0.6, 0.7, 0.6);
-	Globals::spotL.ambientColor = Color(0.2, 0.2, 0.2);
-	Globals::spotL.cutoff = 7;
+	Globals::spotL.diffuseColor = Color(0.6, 0.65, 0.5);
+	Globals::spotL.specularColor = Color(0.7, 0.75, 0.6);
+	Globals::spotL.ambientColor = Color(0.1, 0.1, 0.1);
+	Globals::spotL.cutoff = 15;
 	Globals::spotL.exponent = 100;
 	Globals::spotL.quadraticAttenuation = 0;
 
-	Globals::dirLight.position = Vector4(0.0, 0.0, 0.0, 0.0);
-	Globals::dirLight.diffuseColor = Color(0.4, 0.4, 0.4);
-	Globals::dirLight.ambientColor = Color(0.2, 0.2, 0.2);
+	Globals::dirLight.position = Vector4(50.0, 50.0, 50.0, 0.0);
+	Globals::dirLight.diffuseColor = Color(0.2, 0.2, 0.2);
+	Globals::dirLight.ambientColor = Color(0.5,0.5,0.5);
 	Globals::dirLight.specularColor = Color(0.2, 0.2, 0.2);
 
 	room = Room(100);
 	cube = Cube(3);
+	cube2 = Cube(4);
 	//Initialize room matrix:
 	room.toWorld.identity();
 	cube.toWorld.identity();
-	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(5, -48.5, -25.0);
+	cube.toWorld = cube.toWorld * Matrix4().makeTranslate(5, -48.5, -10.0);
+	cube2.toWorld = cube2.toWorld * Matrix4().makeTranslate(5, -48, -15.0);
 
 	//Setup the room's material properties
 	//Color color(0x23ff27ff);
 	Color color(0.7, 0.7, 0.7);
 	room.material = Material(1);
-	cube.material = Material(2);
+	cube.material = Material(0);
+	cube2.material = Material(0);
 	//shader = new Shader("shadow_simple.vert", "shadow_simple.frag", true);	
 	shader = new Shader("shadowMapping.vert", "shadowMapping.frag", true);
+	//bloom = new Shader("shadow_simple.vert", "shadow_simple.frag", true);
 	genFBO();
 }
 
@@ -115,6 +124,8 @@ void Window::reshapeCallback(int w, int h)
 	glMatrixMode(GL_PROJECTION);                                     //Set the OpenGL matrix mode to Projection
 	glLoadIdentity();                                                //Clear the projection matrix by loading the identity
 	gluPerspective(40.0, (double)width / (double)height, 1.0, 1000.0); //Set perspective projection viewing frustum
+
+	genFBO();
 }
 
 //----------------------------------------------------------------------------
@@ -123,16 +134,16 @@ void Window::displayCallback()
 {
 	//Update camera
 	if (move_forward)
-		Globals::camera.goForward(0.03);
+		Globals::camera.goForward(0.04);
 	if (move_backward)
-		Globals::camera.goBack(0.03);
+		Globals::camera.goBack(0.04);
 	if (move_left)
-		Globals::camera.goLeft(0.03);
+		Globals::camera.goLeft(0.04);
 	if (move_right)
-		Globals::camera.goRight(0.03);
+		Globals::camera.goRight(0.04);
 
-	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
-	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(5, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
+	Globals::spotL.position = Globals::camera.getMatrix() * Matrix4().makeTranslate(3, 0, 1) * Globals::camera.getInverseMatrix() * Globals::camera.e.toVector4(1);
+	Globals::spotL.direction = Globals::camera.getMatrix() * Matrix4().makeTranslate(3, 0, 1) * Globals::camera.getInverseMatrix() * (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 //	Globals::spotL.position = Globals::camera.e.toVector4(1);
 //	Globals::spotL.direction = (Globals::camera.d - Globals::camera.e).normalize().toVector4(0);
 
@@ -145,10 +156,12 @@ void Window::displayCallback()
 	Vector4 l_light = Globals::spotL.position + Globals::spotL.direction;
 	//Vector4 l_light = Globals::spotL.direction;
 	setupLightMatrices(p_light[0], p_light[1], p_light[2], l_light[0], l_light[1], l_light[2]);
-	//glCullFace(GL_FRONT);
-	Globals::spotL.bind(0);
+
+//	Globals::spotL.bind(0);
 	cube.depthRender(Globals::drawData);
+	cube2.depthRender(Globals::drawData);
 	room.depthRender(Globals::drawData);
+	
 //	cube.draw(Globals::drawData);
 //	room.draw(Globals::drawData);
 
@@ -162,24 +175,30 @@ void Window::displayCallback()
 	glUseProgramObjectARB(shader->getPid());
 	shadowMapUniform = glGetUniformLocationARB(shader->getPid(), "ShadowMap");
 	glUniform1iARB(shadowMapUniform, 7);
+	textureUniform = glGetUniformLocationARB(shader->getPid(), "Texture");
 	glActiveTextureARB(GL_TEXTURE7);
 	glBindTexture(GL_TEXTURE_2D, depthTextureId);
+	glActiveTextureARB(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, cube.tex.id);
 
 	Vector3 p_camera = Globals::camera.e;
 	Vector3 l_camera = Globals::camera.d;
 	setupMatrices(p_camera[0], p_camera[1], p_camera[2], l_camera[0], l_camera[1], l_camera[2]);
 
 	//Globals::ptLight.bind(2);
-//	Globals::dirLight.bind(1);
+	Globals::dirLight.bind(1);
 	Globals::spotL.bind(0);
 
 	//Draw the room!
 //	room.draw(Globals::drawData);
 //	cube.draw(Globals::drawData);
-	cube.depthRender(Globals::drawData);
+
 	room.depthRender(Globals::drawData);
-	
+	cube.depthRender(Globals::drawData);
+	cube2.depthRender(Globals::drawData);
+
 	/*
+	// Debug: draw texture to the screen
 	glUseProgramObjectARB(0);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
@@ -189,6 +208,7 @@ void Window::displayCallback()
 	glColor4f(1, 1, 1, 1);
 	glActiveTextureARB(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, depthTextureId);
+	//glBindTexture(GL_TEXTURE_2D, bloomTexId);
 	glEnable(GL_TEXTURE_2D);
 	glTranslated(0, 0, -1);
 	glBegin(GL_QUADS);
@@ -201,31 +221,6 @@ void Window::displayCallback()
 //	*/
 
 	glutSwapBuffers();
-
-	/*
-	//Set the OpenGL matrix mode to ModelView
-	glMatrixMode(GL_MODELVIEW);
-
-	glPushMatrix();
-
-	glLoadMatrixf(Globals::camera.getInverseMatrix().ptr());
-
-	//Globals::ptLight.bind(2);
-	Globals::dirLight.bind(1);
-	Globals::spotL.bind(0);
-
-	//Draw the room!
-	room.draw(Globals::drawData);
-	cube.draw(Globals::drawData);
-
-	//Pop off the changes we made to the matrix stack this frame
-	glPopMatrix();
-	
-	glFlush();
-
-	glutSwapBuffers();
-	*/
-	
 }
 
 void Window::processNormalKeys(unsigned char key, int x, int y) {
@@ -376,12 +371,10 @@ void Window::genFBO(){
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	// Remove artefact on the edges of the shadowmap
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	//glTexParameterfv( GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor );
-
-
 
 	// No need to force GL_DEPTH_COMPONENT24, drivers usually give you the max precision if available 
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, 0);

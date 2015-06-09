@@ -126,6 +126,11 @@ void Room::depthRender(DrawData& data){
 	glPushMatrix();
 	glMultMatrixf(toWorld.ptr());
 
+	glMatrixMode(GL_TEXTURE);
+	glActiveTextureARB(GL_TEXTURE7);
+	glPushMatrix();
+	glMultMatrixf(toWorld.ptr());
+
 	float halfSize = size / 2.0;
 
 	glBegin(GL_QUADS);
@@ -180,6 +185,8 @@ void Room::depthRender(DrawData& data){
 
 	glEnd();
 
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
 }
 

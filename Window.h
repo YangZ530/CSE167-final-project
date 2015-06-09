@@ -13,6 +13,7 @@ protected:
 	static Vector3 trackBall(float, float);
 
 	static Shader* shader;
+	static Shader* bloom;
 
 	static void genFBO();
 	static void setupLightMatrices(float position_x, float position_y, float position_z, float lookAt_x, float lookAt_y, float lookAt_z);

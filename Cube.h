@@ -2,6 +2,7 @@
 #define CSE167_Cube_h
 
 #include "Drawable.h"
+#include "Texture.h"
 
 class Shader;
 
@@ -11,6 +12,8 @@ class Cube : public Drawable
 public:
 	Shader *shader;
 	Shader *lighting, *shadow, *shadowMap;
+
+	Texture tex;
 
 	float size;
 

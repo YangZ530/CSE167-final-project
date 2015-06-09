@@ -6,9 +6,10 @@ varying vec3 normal;
 varying vec4 ShadowCoord;
 
 uniform sampler2D ShadowMap;
+uniform sampler2D Texture;
 
 #define MAXLIGHTS 8
-#define OUTER_ANGLE 0.97
+#define OUTER_ANGLE 0.9397
 
 void main()
 {
@@ -18,6 +19,16 @@ void main()
 	float att;
 	vec3 totalLighting;
 	float visibility = 1.0;
+	float shadow;
+	
+	vec3 texColor = texture2D(Texture, gl_TexCoord[0].xy / gl_TexCoord[0].w).rgb;
+	
+	vec2 poissonDisk[4] = vec2[](
+		vec2( -0.94201624, -0.39906216 ),
+		vec2( 0.94558609, -0.76890725 ),
+		vec2( -0.094184101, -0.92938870 ),
+		vec2( 0.34495938, 0.29387760 )
+		);
 
 	for(int i = 0; i < MAXLIGHTS; i++){
 		att = 1.0;
@@ -41,9 +52,18 @@ void main()
 			float distanceFromLight = texture2D(ShadowMap,shadowCoordinateWdivide.st).z;
 	
 	
-			float shadow = 1.0;
+			shadow = 1.0;
 			if (ShadowCoord.w > 0.0)
 				shadow = distanceFromLight < shadowCoordinateWdivide.z ? 0.5 : 1.0 ;
+			
+			/*
+			shadow = 1.0;
+			for (int i=0;i<4;i++){
+				if ( texture2D( ShadowMap, shadowCoordinateWdivide.st + poissonDisk[i]/700.0 ).z  <  shadowCoordinateWdivide.z ){
+					shadow-=0.2;
+				}
+			}
+//			*/
 			
 			att = 1.0 / (gl_LightSource[i].constantAttenuation
 						+ gl_LightSource[i].linearAttenuation * dist
@@ -64,8 +84,8 @@ void main()
 				att *= shadow;
 			}
 		}
-		vec3 globalAmbient = vec3(gl_FrontLightModelProduct.sceneColor)
-								* vec3(gl_FrontMaterial.ambient);
+		//vec3 globalAmbient = vec3(gl_FrontLightModelProduct.sceneColor)
+		//						* vec3(gl_FrontMaterial.ambient);
 		
 		vec3 ambientReflection = vec3(gl_LightSource[i].ambient)
 									* vec3(gl_FrontMaterial.ambient);
@@ -77,15 +97,25 @@ void main()
 			specularReflection = vec3(0.0, 0.0, 0.0);
 		}
 		else{
+			//diffuseReflection = att * vec3(gl_LightSource[i].diffuse)
+			//						* vec3(gl_FrontMaterial.diffuse)
+			//						* max(0.0, dot(N, L));
 			diffuseReflection = att * vec3(gl_LightSource[i].diffuse)
-									* vec3(gl_FrontMaterial.diffuse)
+									* texColor
 									* max(0.0, dot(N, L));
 			specularReflection = att * vec3(gl_LightSource[i].specular)
 									* vec3(gl_FrontMaterial.specular)
 									* pow(max(0.0, dot(R, E)), gl_FrontMaterial.shininess);
 		}
 		
-		totalLighting = totalLighting + globalAmbient + ambientReflection
+		//totalLighting = totalLighting + globalAmbient + ambientReflection
+		//					+ diffuseReflection + specularReflection;
+		/*
+		if(0.0 == gl_LightSource[i].position.w){
+			specularReflection = vec3(0.0,0.0,0.0);
+		}
+		//*/
+		totalLighting = totalLighting + ambientReflection
 							+ diffuseReflection + specularReflection;
 	}
 	
